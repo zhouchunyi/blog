@@ -1,0 +1,52 @@
+1、	问题描述
+长时间未使用服务器时，服务器会出现宕机，但再次尝试时可恢复正常。
+2、	问题原因
+数据连接使用Mysql+Hibernate。
+Mysql对所有连接的有效时间默认为28800秒，即8小时。也就是如果一个连接8小时没有请求和操作，就会自动断开；但是对于Hibernate来说，它的连接池并不知道它所管理的连接中是否有被MySQL断开的。如果一个程序要使用数据库连接，而Hibernte的连接池分配一个已经被MySQL断开了的给程序使用，那么便会出现错误。
+3、	解决方案
+参考博客：【http://blog.csdn.net/wangfayinn/article/details/24623575】
+beans.xml修改代码参考：【http://www.ablanxue.com/shtml/201402/17256_1.shtml】
+系统采用Spring配置Hibernate，因此没有hibernate的配置文件hibernate.cfg.xml，因此修改的配置文件为beans.xml。
+这里采用“定期使用连接池内连接”方法解决8小时断开问题，采用“c3p0”数据库连接池代替基本的DBCP连接。
+(下载地址【https://sourceforge.net/projects/c3p0/files/latest/download】)
+【*】导入c3p0的包
+将下载包解压将lib内的jar包加入工程。
+如果执行的时候发现不成功，请查看一下out（也就是输出文件夹，名字不一定是out，有的也叫target）中WEB_INF中lib下是否有jar包。（上次配置的时候就没有传过去）
+【*】Beans.xml中Hibernate配置（无须修改）
+其中“dataSource”属性引用该文件中id=”dataSource”的bean，我们需要修改的是ref的“dataSource”。
+ 
+【*】原beans.xml中“dataSource”
+使用的是"org.apache.commons.dbcp.BasicDataSource"
+<bean id="dataSource" destroy-method="close"
+        class="org.apache.commons.dbcp.BasicDataSource">
+        <property name="driverClassName"
+            value="${jdbc.driverClassName}" />
+        <property name="url" value="${jdbc.url}" />
+        <property name="username" value="${jdbc.username}" />
+        <property name="password" value="${jdbc.password}" />
+ </bean>
+【*】修改后beans.xml中“dataSource”
+文件中形如“${jdbc.xxx}”的属性引用”jdbc.properties”中配置。
+C3p0通过向“automaticTestTable”配置的表中定期进行操作保证mysql不断开连接，不可以向该表中进行操作，否则会报错。这个表会自动生成，无须使用者添加。
+具体属性什么意思请参考上面的博客。
+【注意】不要想beans.xml中写过多注释，可能和中文有关，写注释生成输出文件时会报错。
+<bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource" destroy-method="close">
+        <property name="driverClass"
+                  value="${jdbc.driverClassName}"/>
+        <property name="jdbcUrl" value="${jdbc.url}"/>
+        <property name="user" value="${jdbc.username}"/>
+        <property name="password" value="${jdbc.password}"/>
+
+        <property name="minPoolSize" value="1"/>
+        <property name="maxPoolSize" value="100"/>
+        <property name="initialPoolSize" value="1"/>
+        <property name="maxIdleTime" value="25000"/>
+        <property name="acquireIncrement" value="1"/>
+        <property name="acquireRetryAttempts" value="30"/>
+        <property name="acquireRetryDelay" value="1000"/>
+        <property name="testConnectionOnCheckin" value="true"/>
+        <property name="automaticTestTable" value="testlink"/>
+        <property name="idleConnectionTestPeriod" value="18000"/>
+        <property name="checkoutTimeout" value="5000"/>
+ </bean>
+
