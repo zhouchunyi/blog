@@ -1,0 +1,29 @@
+利用阿里云ECS服务器配置自己代码的时候。启动tomcat后，shutdown总会报错说关不掉服务，仔细看错误可能tomcat服务没有启动，而实际上每次start都没有报错。
+通过查看shutdown端口（8005）发现端口没有启动，而过了很久（真的很久）以后shutdown则没有报错。即使将webapps下自己的工程全部移除，访问8080页面也显示不出。
+
+原因：tomcat服务根本没有启动成功，卡在产生随机数上面了
+
+参考博文：【http://www.jianshu.com/p/576d356dc163】
+
+解决方案：扩大系统熵池
+
+系统环境：Ubuntu14.04
+查看熵池大小：cat /proc/sys/kernel/random/entropy_avail
+（1）安装rng服务
+sudo apt-get install rng-tools
+（2）启动服务
+  查看rng服务是否存在： ls /etc/init.d
+  会发现rng-tools在这个文件下
+  添加服务： sudo update-rc.d rng-tools enable
+  这样就可以用： sudo service <service_name> <command> 的方式处理服务
+  command:开启start，关闭stop
+  启动服务：sudo service rng-tools start
+（3）再次查看熵池大小
+cat /proc/sys/kernel/random/entropy_avail
+发现增长到了3000左右。再试试开启tomcat，应该就快了。
+
+我的服务器环境中支持rdrand所以经过上述就可以了，若不支持可以参看参考博文。
+查看是否支持rdrand的命令：
+cat /proc/cpuinfo | grep rdrand
+或
+cat /proc/cpuinfo 自己到最后一项中查看是否包括rdrand
